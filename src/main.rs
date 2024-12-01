@@ -1,8 +1,8 @@
-use std::io;
+use std::{collections::HashMap, io};
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 11, "test input failed");
+    assert_eq!(test_result, 31, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -10,30 +10,28 @@ fn main() {
 }
 
 fn solve(input_path: &str) -> i64 {
-    let mut input = Input::read(input_path);
-
-    input.left.sort();
-    input.right.sort();
+    let input = Input::read(input_path);
 
     let mut total = 0;
-
-    for (l, r) in input.left.into_iter().zip(input.right) {
-        total += l.abs_diff(r) as i64;
+    for (i, count) in input.left {
+        let other_count = *input.right.get(&i).unwrap_or(&0);
+        total += i * count * other_count;
     }
 
     total
 }
 
 struct Input {
-    left: Vec<i64>,
-    right: Vec<i64>,
+    // lists of integers and the number of times they've appeared
+    left: HashMap<i64, i64>,
+    right: HashMap<i64, i64>,
 }
 
 impl Input {
     fn read(filename: &str) -> Input {
         let mut res = Input {
-            left: vec![],
-            right: vec![],
+            left: HashMap::new(),
+            right: HashMap::new(),
         };
 
         for line in read_lines(filename).unwrap() {
@@ -41,11 +39,18 @@ impl Input {
 
             let parts: Vec<&str> = line.split_ascii_whitespace().collect();
 
-            res.left.push(parts[0].parse().unwrap());
-            res.right.push(parts[1].parse().unwrap());
+            let l: i64 = parts[0].parse().unwrap();
+            let r: i64 = parts[1].parse().unwrap();
+
+            Self::add_to_list(l, &mut res.left);
+            Self::add_to_list(r, &mut res.right);
         }
 
         res
+    }
+
+    fn add_to_list(v: i64, list: &mut HashMap<i64, i64>) {
+        *list.entry(v).or_default() += 1;
     }
 }
 
