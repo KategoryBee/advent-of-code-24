@@ -1,8 +1,8 @@
-use std::{collections::HashMap, io};
+use std::io;
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 31, "test input failed");
+    assert_eq!(test_result, 2, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -12,45 +12,58 @@ fn main() {
 fn solve(input_path: &str) -> i64 {
     let input = Input::read(input_path);
 
-    let mut total = 0;
-    for (i, count) in input.left {
-        let other_count = *input.right.get(&i).unwrap_or(&0);
-        total += i * count * other_count;
+    let mut safe = 0;
+    for report in input.reports {
+        if report_ok(&report) {
+            safe += 1;
+        }
     }
 
-    total
+    safe
+}
+
+fn report_ok(report: &[i64]) -> bool {
+    let all_increasing = report.is_sorted_by(|a, b| a < b);
+    let all_decreasing = report.is_sorted_by(|a, b| a > b);
+
+    if !(all_increasing || all_decreasing) {
+        return false;
+    }
+
+    for v in report.windows(2) {
+        let a = v[0];
+        let b = v[1];
+
+        let is_ok = [-1, -2, -3, 1, 2, 3].contains(&(a - b));
+        if !is_ok {
+            return false;
+        }
+    }
+
+    true
 }
 
 struct Input {
-    // lists of integers and the number of times they've appeared
-    left: HashMap<i64, i64>,
-    right: HashMap<i64, i64>,
+    // each report is a list of numbers called 'levels'
+    reports: Vec<Vec<i64>>,
 }
 
 impl Input {
     fn read(filename: &str) -> Input {
-        let mut res = Input {
-            left: HashMap::new(),
-            right: HashMap::new(),
-        };
+        let mut reports = Vec::<Vec<i64>>::new();
 
         for line in read_lines(filename).unwrap() {
             let line = line.unwrap();
 
-            let parts: Vec<&str> = line.split_ascii_whitespace().collect();
+            let parts: Vec<i64> = line
+                .split_ascii_whitespace()
+                .map(|e: &str| e.parse().unwrap())
+                .collect();
 
-            let l: i64 = parts[0].parse().unwrap();
-            let r: i64 = parts[1].parse().unwrap();
-
-            Self::add_to_list(l, &mut res.left);
-            Self::add_to_list(r, &mut res.right);
+            reports.push(parts);
         }
 
-        res
-    }
-
-    fn add_to_list(v: i64, list: &mut HashMap<i64, i64>) {
-        *list.entry(v).or_default() += 1;
+        Input { reports }
     }
 }
 
