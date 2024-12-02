@@ -2,7 +2,7 @@ use std::io;
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 2, "test input failed");
+    assert_eq!(test_result, 4, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -14,12 +14,27 @@ fn solve(input_path: &str) -> i64 {
 
     let mut safe = 0;
     for report in input.reports {
-        if report_ok(&report) {
+        if any_report_permutation_ok(&report) {
             safe += 1;
         }
     }
 
     safe
+}
+
+fn any_report_permutation_ok(report: &[i64]) -> bool {
+    // check if removal of any 1 particular value is ok.
+    for to_ignore in 0..report.len() {
+        let mut reports = report.to_vec();
+        reports.remove(to_ignore);
+        if report_ok(&reports) {
+            println!("{reports:?} is safe");
+            return true;
+        }
+    }
+
+    println!("{report:?} is not safe");
+    false
 }
 
 fn report_ok(report: &[i64]) -> bool {
