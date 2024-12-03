@@ -2,7 +2,7 @@ use std::io;
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 161, "test input failed");
+    assert_eq!(test_result, 48, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -10,17 +10,28 @@ fn main() {
 }
 
 fn solve(input_path: &str) -> i64 {
-    let rx = regex::Regex::new(r"mul\((\d+),(\d+)\)").unwrap();
+    let rx = regex::Regex::new(r"don't|do|mul\((\d+),(\d+)\)").unwrap();
 
     let mut total = 0;
+    let mut mul_enabled = true;
 
     for line in read_lines(input_path).unwrap() {
         let line = line.unwrap();
 
-        for (_, [a, b]) in rx.captures_iter(&line).map(|c| c.extract()) {
-            let a: i64 = a.parse().unwrap();
-            let b: i64 = b.parse().unwrap();
-            total += a * b;
+        for caps in rx.captures_iter(&line) {
+            if &caps[0] == "do" {
+                mul_enabled = true;
+            } else if &caps[0] == "don't" {
+                mul_enabled = false;
+            } else {
+                assert!(caps[0].starts_with("mul"));
+                let a: i64 = caps[1].parse().unwrap();
+                let b: i64 = caps[2].parse().unwrap();
+
+                if mul_enabled {
+                    total += a * b;
+                }
+            }
         }
     }
 
