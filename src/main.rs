@@ -2,7 +2,7 @@ use std::io;
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 48, "test input failed");
+    assert_eq!(test_result, 18, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -10,26 +10,52 @@ fn main() {
 }
 
 fn solve(input_path: &str) -> i64 {
-    let rx = regex::Regex::new(r"don't|do|mul\((\d+),(\d+)\)").unwrap();
-
     let mut total = 0;
-    let mut mul_enabled = true;
 
-    for line in read_lines(input_path).unwrap() {
-        let line = line.unwrap();
+    let field: Vec<Vec<u8>> = read_lines(input_path)
+        .unwrap()
+        .map(|e| e.unwrap().into_bytes())
+        .collect();
 
-        for caps in rx.captures_iter(&line) {
-            if &caps[0] == "do" {
-                mul_enabled = true;
-            } else if &caps[0] == "don't" {
-                mul_enabled = false;
-            } else {
-                assert!(caps[0].starts_with("mul"));
-                let a: i64 = caps[1].parse().unwrap();
-                let b: i64 = caps[2].parse().unwrap();
+    let val_at = |x: i64, y: i64| {
+        if x < 0 || y < 0 {
+            return 0u8;
+        }
 
-                if mul_enabled {
-                    total += a * b;
+        if let Some(row) = field.get(y as usize) {
+            *row.get(x as usize).unwrap_or(&0u8)
+        } else {
+            0u8
+        }
+    };
+
+    let width = field[0].len() as i64;
+    let height = field.len() as i64;
+
+    let offsets = &[
+        (1, -1),
+        (1, 0),
+        (1, 1),
+        (-1, -1),
+        (-1, 0),
+        (-1, 1),
+        (0, -1),
+        (0, 1),
+    ];
+
+    for x in 0..width {
+        for y in 0..height {
+            if val_at(x, y) != b'X' {
+                continue;
+            }
+
+            for &(off_x, off_y) in offsets.iter() {
+                let m = val_at(x + off_x * 1, y + off_y * 1);
+                let a = val_at(x + off_x * 2, y + off_y * 2);
+                let s = val_at(x + off_x * 3, y + off_y * 3);
+
+                if m == b'M' && a == b'A' && s == b'S' {
+                    total += 1;
                 }
             }
         }
