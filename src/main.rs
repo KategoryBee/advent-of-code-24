@@ -2,7 +2,7 @@ use std::io;
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 18, "test input failed");
+    assert_eq!(test_result, 9, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -32,31 +32,22 @@ fn solve(input_path: &str) -> i64 {
     let width = field[0].len() as i64;
     let height = field.len() as i64;
 
-    let offsets = &[
-        (1, -1),
-        (1, 0),
-        (1, 1),
-        (-1, -1),
-        (-1, 0),
-        (-1, 1),
-        (0, -1),
-        (0, 1),
-    ];
-
     for x in 0..width {
         for y in 0..height {
-            if val_at(x, y) != b'X' {
+            if val_at(x, y) != b'A' {
                 continue;
             }
 
-            for &(off_x, off_y) in offsets.iter() {
-                let m = val_at(x + off_x * 1, y + off_y * 1);
-                let a = val_at(x + off_x * 2, y + off_y * 2);
-                let s = val_at(x + off_x * 3, y + off_y * 3);
+            let lu = val_at(x - 1, y - 1);
+            let ld = val_at(x - 1, y + 1);
+            let ru = val_at(x + 1, y - 1);
+            let rd = val_at(x + 1, y + 1);
 
-                if m == b'M' && a == b'A' && s == b'S' {
-                    total += 1;
-                }
+            let has_diag_1 = (lu == b'M' && rd == b'S') || (lu == b'S' && rd == b'M');
+            let has_diag_2 = (ru == b'M' && ld == b'S') || (ru == b'S' && ld == b'M');
+
+            if has_diag_1 && has_diag_2 {
+                total += 1;
             }
         }
     }
