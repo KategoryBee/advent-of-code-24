@@ -1,9 +1,10 @@
-use itertools::Itertools;
 use std::{collections::HashSet, io};
+
+use itertools::Itertools;
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 143, "test input failed");
+    assert_eq!(test_result, 123, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -34,21 +35,28 @@ fn solve(input_path: &str) -> i64 {
         }
     }
 
-    for update in updates {
-        let mut in_correct_order = true;
-        for pages in update.iter().combinations(2) {
-            // combinations always yields the same order for individual elements as the source,
-            // so 'a' is printed before 'b'. We only need to check our orderings to make sure
-            // there's no restriction on b being printed before a.
-            let a = *pages[0];
-            let b = *pages[1];
+    for mut update in updates {
+        let mut update_changed = false;
 
-            if orderings.contains(&(b, a)) {
-                in_correct_order = false;
+        // If we swap elements, all combinations need to be checked again.
+        let mut needs_retry = true;
+        while needs_retry {
+            needs_retry = false;
+
+            for (i, j) in (0..update.len()).tuple_combinations() {
+                let a = update[i];
+                let b = update[j];
+
+                if orderings.contains(&(b, a)) {
+                    update_changed = true;
+                    needs_retry = true;
+
+                    update.swap(i, j);
+                }
             }
         }
 
-        if in_correct_order {
+        if update_changed {
             let middle = update[update.len() / 2];
             total += middle;
         }
