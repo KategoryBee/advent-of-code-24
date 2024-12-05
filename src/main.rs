@@ -1,8 +1,9 @@
-use std::io;
+use itertools::Itertools;
+use std::{collections::HashSet, io};
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 9, "test input failed");
+    assert_eq!(test_result, 143, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -12,43 +13,44 @@ fn main() {
 fn solve(input_path: &str) -> i64 {
     let mut total = 0;
 
-    let field: Vec<Vec<u8>> = read_lines(input_path)
-        .unwrap()
-        .map(|e| e.unwrap().into_bytes())
-        .collect();
+    let mut orderings = HashSet::<(i64, i64)>::new();
+    let mut updates = vec![];
 
-    let val_at = |x: i64, y: i64| {
-        if x < 0 || y < 0 {
-            return 0u8;
+    for line in read_lines(input_path).unwrap() {
+        let line = line.unwrap();
+
+        if line.contains('|') {
+            let mut pages = line.split('|');
+
+            let page: i64 = pages.next().unwrap().parse().unwrap();
+            let is_before: i64 = pages.next().unwrap().parse().unwrap();
+
+            orderings.insert((page, is_before));
         }
 
-        if let Some(row) = field.get(y as usize) {
-            *row.get(x as usize).unwrap_or(&0u8)
-        } else {
-            0u8
+        if line.contains(',') {
+            let update: Vec<i64> = line.split(',').map(|e| e.parse().unwrap()).collect();
+            updates.push(update);
         }
-    };
+    }
 
-    let width = field[0].len() as i64;
-    let height = field.len() as i64;
+    for update in updates {
+        let mut in_correct_order = true;
+        for pages in update.iter().combinations(2) {
+            // combinations always yields the same order for individual elements as the source,
+            // so 'a' is printed before 'b'. We only need to check our orderings to make sure
+            // there's no restriction on b being printed before a.
+            let a = *pages[0];
+            let b = *pages[1];
 
-    for x in 0..width {
-        for y in 0..height {
-            if val_at(x, y) != b'A' {
-                continue;
+            if orderings.contains(&(b, a)) {
+                in_correct_order = false;
             }
+        }
 
-            let lu = val_at(x - 1, y - 1);
-            let ld = val_at(x - 1, y + 1);
-            let ru = val_at(x + 1, y - 1);
-            let rd = val_at(x + 1, y + 1);
-
-            let has_diag_1 = (lu == b'M' && rd == b'S') || (lu == b'S' && rd == b'M');
-            let has_diag_2 = (ru == b'M' && ld == b'S') || (ru == b'S' && ld == b'M');
-
-            if has_diag_1 && has_diag_2 {
-                total += 1;
-            }
+        if in_correct_order {
+            let middle = update[update.len() / 2];
+            total += middle;
         }
     }
 
