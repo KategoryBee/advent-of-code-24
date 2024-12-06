@@ -1,10 +1,8 @@
 use std::{collections::HashSet, io};
 
-use itertools::Itertools;
-
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 123, "test input failed");
+    assert_eq!(test_result, 41, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -12,57 +10,72 @@ fn main() {
 }
 
 fn solve(input_path: &str) -> i64 {
-    let mut total = 0;
+    let mut obstacles = HashSet::new();
+    let mut visited = HashSet::new();
+    let mut position = (0, 0);
+    let mut dir = '^';
+    let mut width = 0;
+    let mut height = 0;
 
-    let mut orderings = HashSet::<(i64, i64)>::new();
-    let mut updates = vec![];
-
-    for line in read_lines(input_path).unwrap() {
+    for (y, line) in read_lines(input_path).unwrap().enumerate() {
         let line = line.unwrap();
 
-        if line.contains('|') {
-            let mut pages = line.split('|');
+        height += 1;
+        width = line.as_bytes().len() as i32;
 
-            let page: i64 = pages.next().unwrap().parse().unwrap();
-            let is_before: i64 = pages.next().unwrap().parse().unwrap();
+        for (x, &c) in line.as_bytes().iter().enumerate() {
+            let pos = (x as i32, y as i32);
+            if c == b'#' {
+                obstacles.insert(pos);
+            }
 
-            orderings.insert((page, is_before));
-        }
-
-        if line.contains(',') {
-            let update: Vec<i64> = line.split(',').map(|e| e.parse().unwrap()).collect();
-            updates.push(update);
-        }
-    }
-
-    for mut update in updates {
-        let mut update_changed = false;
-
-        // If we swap elements, all combinations need to be checked again.
-        let mut needs_retry = true;
-        while needs_retry {
-            needs_retry = false;
-
-            for (i, j) in (0..update.len()).tuple_combinations() {
-                let a = update[i];
-                let b = update[j];
-
-                if orderings.contains(&(b, a)) {
-                    update_changed = true;
-                    needs_retry = true;
-
-                    update.swap(i, j);
-                }
+            if c == b'^' {
+                position = pos;
             }
         }
+    }
 
-        if update_changed {
-            let middle = update[update.len() / 2];
-            total += middle;
+    while position.0 >= 0 && position.1 >= 0 && position.0 < width && position.1 < height {
+        visited.insert(position);
+
+        let movement = match dir {
+            '^' => (0, -1),
+            '>' => (1, 0),
+            'v' => (0, 1),
+            '<' => (-1, 0),
+            _ => panic!("unknown direction {dir}"),
+        };
+
+        let next = (position.0 + movement.0, position.1 + movement.1);
+
+        if obstacles.contains(&next) {
+            dir = match dir {
+                '^' => '>',
+                '>' => 'v',
+                'v' => '<',
+                '<' => '^',
+                _ => panic!("unknown direction {dir}"),
+            }
+        } else {
+            position = next;
         }
     }
 
-    total
+    for y in 0..height + 1 {
+        for x in 0..width + 1 {
+            let p = (x, y);
+            if obstacles.contains(&p) {
+                print!("#")
+            } else if visited.contains(&p) {
+                print!("X")
+            } else {
+                print!(".")
+            }
+        }
+        println!()
+    }
+
+    visited.len() as i64
 }
 
 fn read_lines(filename: &str) -> io::Result<io::Lines<io::BufReader<std::fs::File>>> {
