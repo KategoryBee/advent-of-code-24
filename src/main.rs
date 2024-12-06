@@ -2,7 +2,7 @@ use std::{collections::HashSet, io};
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 41, "test input failed");
+    assert_eq!(test_result, 6, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -11,9 +11,7 @@ fn main() {
 
 fn solve(input_path: &str) -> i64 {
     let mut obstacles = HashSet::new();
-    let mut visited = HashSet::new();
     let mut position = (0, 0);
-    let mut dir = '^';
     let mut width = 0;
     let mut height = 0;
 
@@ -35,8 +33,42 @@ fn solve(input_path: &str) -> i64 {
         }
     }
 
-    while position.0 >= 0 && position.1 >= 0 && position.0 < width && position.1 < height {
-        visited.insert(position);
+    let mut total = 0;
+    for y in 0..height {
+        for x in 0..width {
+            let mut with_extra_blocker = obstacles.clone();
+            with_extra_blocker.insert((x, y));
+
+            if contains_cycle(position, &with_extra_blocker, width, height) {
+                total += 1;
+            }
+        }
+    }
+
+    total
+}
+
+fn contains_cycle(
+    start: (i32, i32),
+    obstacles: &HashSet<(i32, i32)>,
+    field_width: i32,
+    field_height: i32,
+) -> bool {
+    let mut position = start;
+    let mut dir = '^';
+
+    let mut visited = HashSet::new();
+
+    while position.0 >= 0
+        && position.1 >= 0
+        && position.0 < field_width
+        && position.1 < field_height
+    {
+        if visited.contains(&(position, dir)) {
+            return true;
+        }
+
+        visited.insert((position, dir));
 
         let movement = match dir {
             '^' => (0, -1),
@@ -61,21 +93,7 @@ fn solve(input_path: &str) -> i64 {
         }
     }
 
-    for y in 0..height + 1 {
-        for x in 0..width + 1 {
-            let p = (x, y);
-            if obstacles.contains(&p) {
-                print!("#")
-            } else if visited.contains(&p) {
-                print!("X")
-            } else {
-                print!(".")
-            }
-        }
-        println!()
-    }
-
-    visited.len() as i64
+    false
 }
 
 fn read_lines(filename: &str) -> io::Result<io::Lines<io::BufReader<std::fs::File>>> {
