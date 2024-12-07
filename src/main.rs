@@ -1,8 +1,8 @@
-use std::{collections::HashSet, io};
+use std::io;
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 6, "test input failed");
+    assert_eq!(test_result, 3749, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -10,86 +10,51 @@ fn main() {
 }
 
 fn solve(input_path: &str) -> i64 {
-    let mut obstacles = HashSet::new();
-    let mut position = (0, 0);
-    let mut width = 0;
-    let mut height = 0;
+    let mut total = 0;
 
-    for (y, line) in read_lines(input_path).unwrap().enumerate() {
+    for line in read_lines(input_path).unwrap() {
         let line = line.unwrap();
 
-        height += 1;
-        width = line.as_bytes().len() as i32;
+        let mut split = line.split(':');
+        let test_value: i64 = split.next().unwrap().parse().unwrap();
+        let nums: Vec<i64> = split
+            .next()
+            .unwrap()
+            .split_whitespace()
+            .map(|n| n.parse().unwrap())
+            .collect();
 
-        for (x, &c) in line.as_bytes().iter().enumerate() {
-            let pos = (x as i32, y as i32);
-            if c == b'#' {
-                obstacles.insert(pos);
-            }
-
-            if c == b'^' {
-                position = pos;
-            }
-        }
-    }
-
-    let mut total = 0;
-    for y in 0..height {
-        for x in 0..width {
-            let mut with_extra_blocker = obstacles.clone();
-            with_extra_blocker.insert((x, y));
-
-            if contains_cycle(position, &with_extra_blocker, width, height) {
-                total += 1;
-            }
+        if report_ok(test_value, &nums) {
+            total += test_value
         }
     }
 
     total
 }
 
-fn contains_cycle(
-    start: (i32, i32),
-    obstacles: &HashSet<(i32, i32)>,
-    field_width: i32,
-    field_height: i32,
-) -> bool {
-    let mut position = start;
-    let mut dir = '^';
+fn report_ok(test_value: i64, nums: &[i64]) -> bool {
+    // There's probably some fancy rust crate to generate all combinations of something like
+    // [Op; OpCount] as an iterator, but i can't find it. we only have 3 choices, so i'll just
+    // use bitbashing.
+    let op_count = nums.len() - 1;
+    let op_max = 1 << op_count;
 
-    let mut visited = HashSet::new();
+    for i in 0..op_max {
+        let mut o = i;
+        let mut n = nums.iter();
+        let mut running_total = *n.next().unwrap();
 
-    while position.0 >= 0
-        && position.1 >= 0
-        && position.0 < field_width
-        && position.1 < field_height
-    {
-        if visited.contains(&(position, dir)) {
-            return true;
-        }
-
-        visited.insert((position, dir));
-
-        let movement = match dir {
-            '^' => (0, -1),
-            '>' => (1, 0),
-            'v' => (0, 1),
-            '<' => (-1, 0),
-            _ => panic!("unknown direction {dir}"),
-        };
-
-        let next = (position.0 + movement.0, position.1 + movement.1);
-
-        if obstacles.contains(&next) {
-            dir = match dir {
-                '^' => '>',
-                '>' => 'v',
-                'v' => '<',
-                '<' => '^',
-                _ => panic!("unknown direction {dir}"),
+        for &next_num in n {
+            match o & 1 {
+                0 => running_total += next_num,
+                1 => running_total *= next_num,
+                _ => panic!(),
             }
-        } else {
-            position = next;
+            o >>= 1;
+
+            if running_total == test_value {
+                return true;
+            }
         }
     }
 
