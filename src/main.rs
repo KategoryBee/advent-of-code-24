@@ -1,8 +1,10 @@
 use std::io;
 
+use itertools::Itertools;
+
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 3749, "test input failed");
+    assert_eq!(test_result, 11387, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -32,29 +34,39 @@ fn solve(input_path: &str) -> i64 {
     total
 }
 
+#[derive(Debug, Clone, Copy)]
+enum Op {
+    Add,
+    Mul,
+    Concat,
+}
+
 fn report_ok(test_value: i64, nums: &[i64]) -> bool {
     // There's probably some fancy rust crate to generate all combinations of something like
     // [Op; OpCount] as an iterator, but i can't find it. we only have 3 choices, so i'll just
     // use bitbashing.
     let op_count = nums.len() - 1;
-    let op_max = 1 << op_count;
 
-    for i in 0..op_max {
-        let mut o = i;
+    for ops in (0..op_count)
+        .map(|_| [Op::Add, Op::Mul, Op::Concat])
+        .multi_cartesian_product()
+    {
         let mut n = nums.iter();
         let mut running_total = *n.next().unwrap();
 
-        for &next_num in n {
-            match o & 1 {
-                0 => running_total += next_num,
-                1 => running_total *= next_num,
-                _ => panic!(),
+        for (next_num, op) in n.zip(ops) {
+            match op {
+                Op::Add => running_total += next_num,
+                Op::Mul => running_total *= next_num,
+                Op::Concat => {
+                    let concated = format!("{running_total}{next_num}");
+                    running_total = concated.parse().unwrap();
+                }
             }
-            o >>= 1;
+        }
 
-            if running_total == test_value {
-                return true;
-            }
+        if running_total == test_value {
+            return true;
         }
     }
 
