@@ -1,76 +1,74 @@
-use std::io;
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+};
 
 use itertools::Itertools;
 
 fn main() {
-    let test_result = solve("test.txt");
-    assert_eq!(test_result, 11387, "test input failed");
+    let test_result = solve("test.txt", (12, 12));
+    assert_eq!(test_result, 14, "test input failed");
     println!("Test passed");
 
-    let result = solve("input.txt");
+    let result = solve("input.txt", (50, 50));
     println!("result: {result}");
 }
 
-fn solve(input_path: &str) -> i64 {
-    let mut total = 0;
+fn solve(input_path: &str, map_size: (i64, i64)) -> usize {
+    let antennas = parse_antennas(input_path);
+    let nodes = collect_nodes(&antennas);
 
-    for line in read_lines(input_path).unwrap() {
-        let line = line.unwrap();
-
-        let mut split = line.split(':');
-        let test_value: i64 = split.next().unwrap().parse().unwrap();
-        let nums: Vec<i64> = split
-            .next()
-            .unwrap()
-            .split_whitespace()
-            .map(|n| n.parse().unwrap())
-            .collect();
-
-        if report_ok(test_value, &nums) {
-            total += test_value
-        }
-    }
-
-    total
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Op {
-    Add,
-    Mul,
-    Concat,
-}
-
-fn report_ok(test_value: i64, nums: &[i64]) -> bool {
-    // There's probably some fancy rust crate to generate all combinations of something like
-    // [Op; OpCount] as an iterator, but i can't find it. we only have 3 choices, so i'll just
-    // use bitbashing.
-    let op_count = nums.len() - 1;
-
-    for ops in (0..op_count)
-        .map(|_| [Op::Add, Op::Mul, Op::Concat])
-        .multi_cartesian_product()
-    {
-        let mut n = nums.iter();
-        let mut running_total = *n.next().unwrap();
-
-        for (next_num, op) in n.zip(ops) {
-            match op {
-                Op::Add => running_total += next_num,
-                Op::Mul => running_total *= next_num,
-                Op::Concat => {
-                    let concated = format!("{running_total}{next_num}");
-                    running_total = concated.parse().unwrap();
-                }
+    for y in 0..map_size.1 {
+        for x in 0..map_size.0 {
+            if nodes.contains(&(x, y)) {
+                print!("#");
+            } else {
+                print!(".");
             }
         }
+        println!()
+    }
 
-        if running_total == test_value {
-            return true;
+    nodes.iter().filter(|&&p| within_map(p, map_size)).count()
+}
+
+fn parse_antennas(input_path: &str) -> HashMap<char, Vec<(i64, i64)>> {
+    let mut result: HashMap<char, Vec<(i64, i64)>> = HashMap::new();
+
+    for (y, input) in read_lines(input_path).unwrap().enumerate() {
+        let input = input.unwrap();
+        for (x, c) in input.chars().enumerate() {
+            if c == '.' {
+                continue;
+            }
+
+            result.entry(c).or_default().push((x as _, y as _));
         }
     }
 
-    false
+    result
+}
+
+fn collect_nodes(antennas: &HashMap<char, Vec<(i64, i64)>>) -> HashSet<(i64, i64)> {
+    let mut result = HashSet::new();
+
+    for a in antennas.values() {
+        for (l, r) in a.iter().tuple_combinations() {
+            let dist = (l.0 - r.0, l.1 - r.1);
+
+            let node1 = (l.0 + dist.0, l.1 + dist.1);
+            let node2 = (r.0 - dist.0, r.1 - dist.1);
+
+            result.insert(node1);
+            result.insert(node2);
+        }
+    }
+
+    result
+}
+
+fn within_map(p: (i64, i64), map_size: (i64, i64)) -> bool {
+    p.0 >= 0 && p.1 >= 0 && p.0 < map_size.0 && p.1 < map_size.1
 }
 
 fn read_lines(filename: &str) -> io::Result<io::Lines<io::BufReader<std::fs::File>>> {
