@@ -1,78 +1,90 @@
-use std::{
-    collections::{HashMap, HashSet},
-    io,
-};
+use std::{collections::VecDeque, io};
 
-use itertools::Itertools;
+use num::Integer;
 
 fn main() {
-    let test_result = solve("test.txt", (12, 12));
-    assert_eq!(test_result, 34, "test input failed");
+    let test_result = solve("test.txt");
+    assert_eq!(test_result, 1928, "test input failed");
     println!("Test passed");
 
-    let result = solve("input.txt", (50, 50));
+    let result = solve("input.txt");
     println!("result: {result}");
 }
 
-fn solve(input_path: &str, map_size: (i64, i64)) -> usize {
-    let antennas = parse_antennas(input_path);
-    let nodes = collect_nodes(&antennas);
+fn solve(input_path: &str) -> usize {
+    let mut input = read_input(input_path);
 
-    for y in 0..map_size.1 {
-        for x in 0..map_size.0 {
-            if nodes.contains(&(x, y)) {
-                print!("#");
-            } else {
-                print!(".");
-            }
+    let mut total = 0;
+    let mut position = 0;
+    while !input.is_empty() {
+        // We consume the front 1 'len' at a time, each iteration.
+        let front = input.front_mut().unwrap();
+        let front_id = front.id;
+
+        assert!(front.len > 0);
+        front.len -= 1;
+        if front.len == 0 {
+            input.pop_front();
         }
-        println!()
-    }
 
-    nodes.iter().filter(|&&p| within_map(p, map_size)).count()
-}
+        if let Some(file_id) = front_id {
+            total += position * file_id;
+            position += 1;
+            continue;
+        }
 
-fn parse_antennas(input_path: &str) -> HashMap<char, Vec<(i64, i64)>> {
-    let mut result: HashMap<char, Vec<(i64, i64)>> = HashMap::new();
-
-    for (y, input) in read_lines(input_path).unwrap().enumerate() {
-        let input = input.unwrap();
-        for (x, c) in input.chars().enumerate() {
-            if c == '.' {
+        // If we get here, there's empty space on the front that we need to fill by reading from
+        // the back. We _might_ actually already be at the end too, or perhaps the front and back
+        // blocks are the same block. so take care of that.
+        //
+        // The while here _is important_. We MUST read something from the back since we already
+        // 'consumed' from the front.
+        while let Some(back) = input.back_mut() {
+            if back.id.is_none() {
+                input.pop_back();
                 continue;
             }
 
-            result.entry(c).or_default().push((x as _, y as _));
-        }
-    }
-
-    result
-}
-
-fn collect_nodes(antennas: &HashMap<char, Vec<(i64, i64)>>) -> HashSet<(i64, i64)> {
-    let mut result = HashSet::new();
-
-    for a in antennas.values() {
-        for (l, r) in a.iter().tuple_combinations() {
-            let dist = (l.0 - r.0, l.1 - r.1);
-
-            for mul in 0..50 {
-                let dist = (dist.0 * mul, dist.1 * mul);
-
-                let node1 = (l.0 + dist.0, l.1 + dist.1);
-                let node2 = (r.0 - dist.0, r.1 - dist.1);
-
-                result.insert(node1);
-                result.insert(node2);
+            // Otherwise there's a file we pretend to defrag by moving to the front
+            let file_id = back.id.unwrap();
+            assert!(back.len > 0);
+            back.len -= 1;
+            if back.len == 0 {
+                input.pop_back();
             }
+
+            total += position * file_id;
+            position += 1;
+            break;
+        }
+    }
+
+    total
+}
+
+#[derive(Debug)]
+struct InputBlock {
+    id: Option<usize>, // None if empty space
+    len: usize,
+}
+
+fn read_input(input_path: &str) -> VecDeque<InputBlock> {
+    let line = read_lines(input_path).unwrap().next().unwrap().unwrap();
+    let as_bytes = line.as_bytes();
+
+    let mut result = VecDeque::new();
+
+    for (i, &b) in as_bytes.iter().enumerate() {
+        let is_file = i.is_even();
+        let len = (b - b'0') as usize;
+        let id = if is_file { Some(i / 2) } else { None };
+
+        if len > 0 {
+            result.push_back(InputBlock { id, len });
         }
     }
 
     result
-}
-
-fn within_map(p: (i64, i64), map_size: (i64, i64)) -> bool {
-    p.0 >= 0 && p.1 >= 0 && p.0 < map_size.0 && p.1 < map_size.1
 }
 
 fn read_lines(filename: &str) -> io::Result<io::Lines<io::BufReader<std::fs::File>>> {
