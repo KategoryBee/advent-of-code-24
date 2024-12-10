@@ -7,7 +7,7 @@ use itertools::Itertools;
 
 fn main() {
     let test_result = solve("test.txt", (12, 12));
-    assert_eq!(test_result, 14, "test input failed");
+    assert_eq!(test_result, 34, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt", (50, 50));
@@ -56,11 +56,15 @@ fn collect_nodes(antennas: &HashMap<char, Vec<(i64, i64)>>) -> HashSet<(i64, i64
         for (l, r) in a.iter().tuple_combinations() {
             let dist = (l.0 - r.0, l.1 - r.1);
 
-            let node1 = (l.0 + dist.0, l.1 + dist.1);
-            let node2 = (r.0 - dist.0, r.1 - dist.1);
+            for mul in 0..50 {
+                let dist = (dist.0 * mul, dist.1 * mul);
 
-            result.insert(node1);
-            result.insert(node2);
+                let node1 = (l.0 + dist.0, l.1 + dist.1);
+                let node2 = (r.0 - dist.0, r.1 - dist.1);
+
+                result.insert(node1);
+                result.insert(node2);
+            }
         }
     }
 
