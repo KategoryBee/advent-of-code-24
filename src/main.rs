@@ -1,8 +1,10 @@
-use std::{collections::HashMap, io};
+use std::io;
+
+use num::Integer;
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 81, "test input failed");
+    assert_eq!(test_result, 55312, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -12,60 +14,43 @@ fn main() {
 fn solve(input_path: &str) -> usize {
     let input = read_input(input_path);
 
-    let starting_tiles = input.iter().filter(|p| *p.1 == 0);
-
     let mut total = 0;
-    for (&start, _) in starting_tiles {
-        total += trails_at(start, 0, &input);
+    for stone in input {
+        total += stones_after_iters(&stone, 25);
     }
 
     total
 }
 
-fn trails_at(pos: (i8, i8), height: u8, input: &HashMap<(i8, i8), u8>) -> usize {
-    if height == 9 {
+fn stones_after_iters(stone: &str, iterations_left: i32) -> usize {
+    if iterations_left == 0 {
         return 1;
     }
 
-    let left = (pos.0 - 1, pos.1);
-    let right = (pos.0 + 1, pos.1);
-    let up = (pos.0, pos.1 - 1);
-    let down = (pos.0, pos.1 + 1);
+    let iters_remain = iterations_left - 1;
 
-    let next_height = height + 1;
+    if stone == "0" {
+        stones_after_iters("1", iters_remain)
+    } else if stone.len().is_even() {
+        let mid = stone.len() / 2;
+        let (l, r) = stone.split_at(mid);
 
-    let mut found = 0;
+        let r = r.trim_start_matches('0');
+        let r = if r.is_empty() { "0" } else { r };
 
-    if input.get(&left) == Some(&next_height) {
-        found += trails_at(left, next_height, input);
+        stones_after_iters(l, iters_remain) + stones_after_iters(r, iters_remain)
+    } else {
+        let mulleed: usize = stone.parse::<usize>().unwrap() * 2024;
+
+        stones_after_iters(&mulleed.to_string(), iters_remain)
     }
-
-    if input.get(&right) == Some(&next_height) {
-        found += trails_at(right, next_height, input);
-    }
-
-    if input.get(&up) == Some(&next_height) {
-        found += trails_at(up, next_height, input);
-    }
-
-    if input.get(&down) == Some(&next_height) {
-        found += trails_at(down, next_height, input);
-    }
-
-    found
 }
 
-fn read_input(input_path: &str) -> HashMap<(i8, i8), u8> {
-    let mut res = HashMap::new();
-
-    for (y, line) in read_lines(input_path).unwrap().enumerate() {
-        let line = line.unwrap();
-        for (x, c) in line.bytes().enumerate() {
-            res.insert((x as _, y as _), c - b'0');
-        }
-    }
-
-    res
+fn read_input(input_path: &str) -> Vec<String> {
+    let line = read_lines(input_path).unwrap().next().unwrap().unwrap();
+    line.split_ascii_whitespace()
+        .map(|x| x.to_owned())
+        .collect()
 }
 
 fn read_lines(filename: &str) -> io::Result<io::Lines<io::BufReader<std::fs::File>>> {
