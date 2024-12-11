@@ -1,10 +1,11 @@
-use std::io;
-
-use num::Integer;
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+};
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 2858, "test input failed");
+    assert_eq!(test_result, 36, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -12,93 +13,65 @@ fn main() {
 }
 
 fn solve(input_path: &str) -> usize {
-    let mut input = read_input(input_path);
+    let input = read_input(input_path);
 
-    let mut moved_files = Vec::new();
-
-    for mut file in input.files.into_iter().rev() {
-        // Since we only move backward through files, and only touch them once, we don't need to
-        // insert spaces as we 'free' them up, since no file could possibly move in to that space.
-
-        let move_to = input
-            .spaces
-            .iter_mut()
-            .find(|s| s.len >= file.pos.len && s.start < file.pos.start);
-
-        if let Some(dest) = move_to {
-            file.pos.start = dest.start;
-
-            // Empty out the space. We _could_ deallocate the found space here and that might speed
-            // things up, but I'm too lazy to import a list datastructure and test if it ends up
-            // faster
-            dest.start += file.pos.len;
-            dest.len -= file.pos.len;
-            moved_files.push(file);
-        } else {
-            // No space available. Stay in place
-            moved_files.push(file);
-        }
-    }
+    let starting_tiles = input.iter().filter(|p| *p.1 == 0);
 
     let mut total = 0;
-
-    for f in moved_files {
-        for pos in f.pos.to_range() {
-            total += pos * f.id;
-        }
+    for (&start, _) in starting_tiles {
+        let mut reachable_ends = HashSet::new();
+        trails_at(start, 0, &input, &mut reachable_ends);
+        total += reachable_ends.len();
     }
 
     total
 }
 
-#[derive(Debug)]
-struct Input {
-    files: Vec<File>,
-    spaces: Vec<Span>,
-}
+fn trails_at(
+    pos: (i8, i8),
+    height: u8,
+    input: &HashMap<(i8, i8), u8>,
+    ends: &mut HashSet<(i8, i8)>,
+) {
+    if height == 9 {
+        ends.insert(pos);
+    }
 
-#[derive(Debug)]
-struct File {
-    id: usize,
-    pos: Span,
-}
+    let left = (pos.0 - 1, pos.1);
+    let right = (pos.0 + 1, pos.1);
+    let up = (pos.0, pos.1 - 1);
+    let down = (pos.0, pos.1 + 1);
 
-#[derive(Debug)]
-struct Span {
-    start: usize,
-    len: usize,
-}
+    let next_height = height + 1;
 
-impl Span {
-    fn to_range(&self) -> std::ops::Range<usize> {
-        self.start..(self.start + self.len)
+    if input.get(&left) == Some(&next_height) {
+        trails_at(left, next_height, input, ends);
+    }
+
+    if input.get(&right) == Some(&next_height) {
+        trails_at(right, next_height, input, ends);
+    }
+
+    if input.get(&up) == Some(&next_height) {
+        trails_at(up, next_height, input, ends);
+    }
+
+    if input.get(&down) == Some(&next_height) {
+        trails_at(down, next_height, input, ends);
     }
 }
 
-fn read_input(input_path: &str) -> Input {
-    let line = read_lines(input_path).unwrap().next().unwrap().unwrap();
-    let as_bytes = line.as_bytes();
+fn read_input(input_path: &str) -> HashMap<(i8, i8), u8> {
+    let mut res = HashMap::new();
 
-    let mut files = Vec::new();
-    let mut spaces = Vec::new();
-    let mut offset = 0;
-
-    for (i, &b) in as_bytes.iter().enumerate() {
-        let is_file = i.is_even();
-        let len = (b - b'0') as usize;
-
-        let pos = Span { start: offset, len };
-        offset += len;
-
-        if is_file {
-            assert_ne!(len, 0);
-            files.push(File { id: i / 2, pos });
-        } else if len > 0 {
-            spaces.push(pos);
-        };
+    for (y, line) in read_lines(input_path).unwrap().enumerate() {
+        let line = line.unwrap();
+        for (x, c) in line.bytes().enumerate() {
+            res.insert((x as _, y as _), c - b'0');
+        }
     }
 
-    Input { files, spaces }
+    res
 }
 
 fn read_lines(filename: &str) -> io::Result<io::Lines<io::BufReader<std::fs::File>>> {
