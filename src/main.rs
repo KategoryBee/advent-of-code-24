@@ -1,11 +1,8 @@
-use std::{
-    collections::{HashMap, HashSet},
-    io,
-};
+use std::{collections::HashMap, io};
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 36, "test input failed");
+    assert_eq!(test_result, 81, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -19,22 +16,15 @@ fn solve(input_path: &str) -> usize {
 
     let mut total = 0;
     for (&start, _) in starting_tiles {
-        let mut reachable_ends = HashSet::new();
-        trails_at(start, 0, &input, &mut reachable_ends);
-        total += reachable_ends.len();
+        total += trails_at(start, 0, &input);
     }
 
     total
 }
 
-fn trails_at(
-    pos: (i8, i8),
-    height: u8,
-    input: &HashMap<(i8, i8), u8>,
-    ends: &mut HashSet<(i8, i8)>,
-) {
+fn trails_at(pos: (i8, i8), height: u8, input: &HashMap<(i8, i8), u8>) -> usize {
     if height == 9 {
-        ends.insert(pos);
+        return 1;
     }
 
     let left = (pos.0 - 1, pos.1);
@@ -44,21 +34,25 @@ fn trails_at(
 
     let next_height = height + 1;
 
+    let mut found = 0;
+
     if input.get(&left) == Some(&next_height) {
-        trails_at(left, next_height, input, ends);
+        found += trails_at(left, next_height, input);
     }
 
     if input.get(&right) == Some(&next_height) {
-        trails_at(right, next_height, input, ends);
+        found += trails_at(right, next_height, input);
     }
 
     if input.get(&up) == Some(&next_height) {
-        trails_at(up, next_height, input, ends);
+        found += trails_at(up, next_height, input);
     }
 
     if input.get(&down) == Some(&next_height) {
-        trails_at(down, next_height, input, ends);
+        found += trails_at(down, next_height, input);
     }
+
+    found
 }
 
 fn read_input(input_path: &str) -> HashMap<(i8, i8), u8> {
