@@ -1,11 +1,14 @@
-use std::{collections::HashMap, io};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+};
 
-use num::Integer;
+type Pos = (i16, i16);
 
 fn main() {
-    // let test_result = solve("test.txt");
-    // assert_eq!(test_result, 55312, "test input failed");
-    // println!("Test passed");
+    let test_result = solve("test.txt");
+    assert_eq!(test_result, 1930, "test input failed");
+    println!("Test passed");
 
     let result = solve("input.txt");
     println!("result: {result}");
@@ -14,58 +17,83 @@ fn main() {
 fn solve(input_path: &str) -> usize {
     let input = read_input(input_path);
 
-    let mut memoized = HashMap::new();
+    let regions = balkanize(input);
+
     let mut total = 0;
-    for stone in input.iter() {
-        total += stones_after_iters(&stone, 75, &mut memoized);
+    for r in regions {
+        let perim = perimiter_of(&r);
+        total += perim * r.len();
     }
 
     total
 }
 
-fn stones_after_iters<'a>(
-    stone: &'a str,
-    iterations_left: i32,
-    memoized: &mut HashMap<(&'a str, i32), usize>,
-) -> usize {
-    if let Some(&r) = memoized.get(&(stone, iterations_left)) {
-        return r;
+fn perimiter_of(region: &HashSet<Pos>) -> usize {
+    let mut total = 0;
+
+    for &pos in region {
+        let neighbours = [
+            (pos.0 - 1, pos.1),
+            (pos.0 + 1, pos.1),
+            (pos.0, pos.1 - 1),
+            (pos.0, pos.1 + 1),
+        ];
+
+        for adjacent in neighbours {
+            if !region.contains(&adjacent) {
+                total += 1;
+            }
+        }
     }
 
-    if iterations_left == 0 {
-        return 1;
-    }
-
-    let iters_remain = iterations_left - 1;
-
-    let res = if stone == "0" {
-        stones_after_iters("1", iters_remain, memoized)
-    } else if stone.len().is_even() {
-        let mid = stone.len() / 2;
-        let (l, r) = stone.split_at(mid);
-
-        let r = r.trim_start_matches('0');
-        let r = if r.is_empty() { "0" } else { r };
-
-        stones_after_iters(l, iters_remain, memoized)
-            + stones_after_iters(r, iters_remain, memoized)
-    } else {
-        let mulleed: usize = stone.parse::<usize>().unwrap() * 2024;
-
-        // Eh just leak it rather than appease the borrow checker. We're dynamic programming anyway
-        // and have a short runtime.
-        stones_after_iters(mulleed.to_string().leak(), iters_remain, memoized)
-    };
-
-    memoized.insert((stone, iterations_left), res);
-    res
+    total
 }
 
-fn read_input(input_path: &str) -> Vec<String> {
-    let line = read_lines(input_path).unwrap().next().unwrap().unwrap();
-    line.split_ascii_whitespace()
-        .map(|x| x.to_owned())
-        .collect()
+// Turn the input in to a list of regions
+fn balkanize(mut input: HashMap<Pos, u8>) -> Vec<HashSet<Pos>> {
+    let mut result = Vec::new();
+
+    while let Some((&start, &plant)) = input.iter().next() {
+        let mut region = HashSet::new();
+        extract_region(start, plant, &mut input, &mut region);
+        result.push(region);
+    }
+
+    result
+}
+
+fn extract_region(start: Pos, plant: u8, input: &mut HashMap<Pos, u8>, output: &mut HashSet<Pos>) {
+    let mut to_check = vec![start];
+
+    while let Some(pos) = to_check.pop() {
+        if input.get(&pos) != Some(&plant) {
+            continue;
+        }
+
+        input.remove(&pos);
+        output.insert(pos);
+
+        let neighbours = [
+            (pos.0 - 1, pos.1),
+            (pos.0 + 1, pos.1),
+            (pos.0, pos.1 - 1),
+            (pos.0, pos.1 + 1),
+        ];
+
+        for adjacent in neighbours {
+            to_check.push(adjacent);
+        }
+    }
+}
+
+fn read_input(input_path: &str) -> HashMap<Pos, u8> {
+    let mut res = HashMap::new();
+    for (y, line) in read_lines(input_path).unwrap().enumerate() {
+        for (x, c) in line.unwrap().bytes().enumerate() {
+            res.insert((x as _, y as _), c);
+        }
+    }
+    res
 }
 
 fn read_lines(filename: &str) -> io::Result<io::Lines<io::BufReader<std::fs::File>>> {
