@@ -1,11 +1,11 @@
-use std::io;
+use std::{collections::HashSet, io};
 
 use regex::Regex;
 
 fn main() {
-    let test_result = solve("test.txt", Vec2(11, 7));
-    assert_eq!(test_result, 12, "test input failed");
-    println!("Test passed");
+    // let test_result = solve("test.txt", Vec2(11, 7));
+    // assert_eq!(test_result, 12, "test input failed");
+    // println!("Test passed");
 
     let result = solve("input.txt", Vec2(101, 103));
     println!("result: {result}");
@@ -14,48 +14,69 @@ fn main() {
 fn solve(input_path: &str, field_size: Vec2) -> i64 {
     let mut robots = read_input(input_path);
 
-    let ticks = 100;
+    for tick in 1..1000000 {
+        // Move robots and collect current positions.
+        let mut positions = HashSet::new();
+        for r in robots.iter_mut() {
+            r.pos += r.vel;
 
-    for r in robots.iter_mut() {
-        r.pos += r.vel * ticks;
+            r.pos.0 %= field_size.0;
+            if r.pos.0 < 0 {
+                r.pos.0 += field_size.0;
+            }
+            r.pos.1 %= field_size.1;
+            if r.pos.1 < 0 {
+                r.pos.1 += field_size.1;
+            }
 
-        r.pos.0 %= field_size.0;
-        if r.pos.0 < 0 {
-            r.pos.0 += field_size.0;
-        }
-        r.pos.1 %= field_size.1;
-        if r.pos.1 < 0 {
-            r.pos.1 += field_size.1;
-        }
-    }
-
-    // collect in to buckets
-    let midpoint_x = field_size.0 / 2;
-    let midpoint_y = field_size.1 / 2;
-
-    let mut total_tl = 0;
-    let mut total_tr = 0;
-    let mut total_bl = 0;
-    let mut total_br = 0;
-
-    for r in robots {
-        if r.pos.0 == midpoint_x || r.pos.1 == midpoint_y {
-            // on centre line. doing it this way to make the match easier
-            continue;
+            positions.insert(r.pos);
         }
 
-        match (r.pos.0 < midpoint_x, r.pos.1 < midpoint_y) {
-            (true, true) => total_tl += 1,
-            (true, false) => total_bl += 1,
-            (false, true) => total_tr += 1,
-            (false, false) => total_br += 1,
+        if looks_like_an_xmas_tree(&positions) {
+            println!("Iteration {tick}");
+            print_field(&positions, field_size);
+            return tick;
         }
     }
 
-    total_tl * total_tr * total_bl * total_br
+    panic!("Couldn't find tree");
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+// Assuming it's a typical xmas tree, it probably has a long uninterrupted vertical bit?
+fn looks_like_an_xmas_tree(positions: &HashSet<Vec2>) -> bool {
+    let expected_len = 10;
+    for p in positions {
+        let mut trunk_len = 0;
+
+        for y in 0..expected_len {
+            if positions.contains(&(*p + Vec2(y, 0))) {
+                trunk_len += 1;
+            }
+        }
+
+        if trunk_len == expected_len {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn print_field(positions: &HashSet<Vec2>, field_size: Vec2) {
+    for y in 0..field_size.1 {
+        for x in 0..field_size.0 {
+            let c = if positions.contains(&Vec2(x, y)) {
+                '#'
+            } else {
+                ' '
+            };
+            print!("{c}");
+        }
+        println!();
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct Vec2(i32, i32);
 
 impl std::ops::Add<Vec2> for Vec2 {
