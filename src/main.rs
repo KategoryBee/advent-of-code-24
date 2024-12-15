@@ -2,7 +2,7 @@ use std::{collections::HashSet, io};
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 10092, "test input failed");
+    assert_eq!(test_result, 9021, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -13,52 +13,85 @@ fn solve(input_path: &str) -> i64 {
     let mut input = read_input(input_path);
 
     for m in input.instructions {
-        let dir = m.to_vec();
+        #[cfg(debug_assertions)]
+        print_field(input.robot, &input.boxes, &input.walls);
+        // Need to recursively move everything at pos X, in dir. includes checcking to left of pos
+        // for a box. Then bail out of _all_ moves if any would hit a wall.
+        let robot_dest = input.robot + m.to_vec();
+        let mut new_boxes = input.boxes.clone();
 
-        // Try to move one dir. Scan in that direction, from the robot, until we hit either an Empty
-        // space, or a wall, or a box. If it's a box, continue scanning.
-        //
-        // If it's a wall, no-op.
-        // Otherwise move robot one cell in wanted direction.
-        // If there's a box there, move that box to the empty space we located to simulate pushing
-        // the entire stock
-        let scan = find_space(input.robot, dir, &input.boxes, &input.walls);
-        match scan {
-            None => (), // found a wall. no op
-            Some(empty_space) => {
-                input.robot += dir;
-                if input.boxes.take(&input.robot).is_some() {
-                    input.boxes.insert(empty_space);
-                }
-            }
+        if try_move(robot_dest, m, &input.walls, &mut new_boxes) {
+            input.robot = robot_dest;
+            input.boxes = new_boxes;
         }
     }
 
+    print_field(input.robot, &input.boxes, &input.walls);
     gps_sum(&input.boxes)
 }
 
-fn find_space(
-    start: Vec2,
-    dir: Vec2,
-    boxes: &HashSet<Vec2>,
-    walls: &HashSet<Vec2>,
-) -> Option<Vec2> {
-    let mut pos = start;
-    for _ in 0..1000 {
-        pos += dir;
-        if boxes.contains(&pos) {
-            // Continue scanning
-            continue;
-        }
-        if walls.contains(&pos) {
-            return None;
-        }
+fn print_field(robot: Vec2, boxes: &HashSet<Vec2>, walls: &HashSet<Vec2>) {
+    for y in 0..50 {
+        for x in 0..100 {
+            let pos = Vec2(x, y);
+            let left = Vec2(x - 1, y);
 
-        // Otherwise, empty space
-        return Some(pos);
+            let c = if pos == robot {
+                '@'
+            } else if walls.contains(&pos) {
+                '#'
+            } else if boxes.contains(&pos) {
+                '['
+            } else if boxes.contains(&left) {
+                // current pos is to the right of a box
+                ']'
+            } else {
+                '.'
+            };
+            print!("{c}");
+        }
+        println!();
+    }
+}
+
+// `position` is the space where something is trying to move in to.
+fn try_move(position: Vec2, m: Move, walls: &HashSet<Vec2>, boxes: &mut HashSet<Vec2>) -> bool {
+    if walls.contains(&position) {
+        return false;
     }
 
-    panic!("Could not find empty space or wall after too many iterations");
+    if let Some(box_left) = boxes.take(&position) {
+        // Hit the left side of a box
+        let box_right = box_left + Vec2(1, 0);
+
+        let left_ok = try_move(box_left + m.to_vec(), m, walls, boxes);
+        let right_ok = try_move(box_right + m.to_vec(), m, walls, boxes);
+
+        if left_ok && right_ok {
+            boxes.insert(box_left + m.to_vec());
+        } else {
+            boxes.insert(box_left);
+            return false;
+        }
+    }
+
+    if let Some(box_left) = boxes.take(&(position + Vec2(-1, 0))) {
+        // Hit the right side of a box
+        let box_right = box_left + Vec2(1, 0);
+
+        let left_ok = try_move(box_left + m.to_vec(), m, walls, boxes);
+        let right_ok = try_move(box_right + m.to_vec(), m, walls, boxes);
+
+        if left_ok && right_ok {
+            boxes.insert(box_left + m.to_vec());
+        } else {
+            boxes.insert(box_left);
+            return false;
+        }
+    }
+
+    // empty space, can move in to it ok.
+    true
 }
 
 fn gps_sum(boxes: &HashSet<Vec2>) -> i64 {
@@ -90,6 +123,7 @@ impl std::ops::Mul<i32> for Vec2 {
     }
 }
 
+#[derive(Clone, Copy)]
 enum Move {
     Up,
     Right,
@@ -138,16 +172,21 @@ fn read_input(input_path: &str) -> Input {
 
         if line.starts_with('#') {
             for (x, c) in line.chars().enumerate() {
-                let pos = Vec2(x as _, y);
+                let pos_l = Vec2((x * 2) as _, y);
+                let pos_r = Vec2((x * 2 + 1) as _, y);
+
                 match c {
                     '#' => {
-                        res.walls.insert(pos);
+                        res.walls.insert(pos_l);
+                        res.walls.insert(pos_r);
                     }
                     'O' => {
-                        res.boxes.insert(pos);
+                        // We track the 'left' side of the box as its origin, and the rest of the
+                        // code assumes it extends to the right.
+                        res.boxes.insert(pos_l);
                     }
                     '@' => {
-                        res.robot = pos;
+                        res.robot = pos_l;
                     }
                     '.' => (), // empty space
                     other => panic!("expected map character {other}"),
