@@ -1,104 +1,80 @@
-use std::{collections::HashSet, io};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+};
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 9021, "test input failed");
+    assert_eq!(test_result, 7036, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
     println!("result: {result}");
 }
 
-fn solve(input_path: &str) -> i64 {
-    let mut input = read_input(input_path);
+fn solve(input_path: &str) -> i32 {
+    let input = read_input(input_path);
 
-    for m in input.instructions {
-        #[cfg(debug_assertions)]
-        print_field(input.robot, &input.boxes, &input.walls);
-        // Need to recursively move everything at pos X, in dir. includes checcking to left of pos
-        // for a box. Then bail out of _all_ moves if any would hit a wall.
-        let robot_dest = input.robot + m.to_vec();
-        let mut new_boxes = input.boxes.clone();
+    let cost_move = 1;
+    let cost_rotate = 1000;
 
-        if try_move(robot_dest, m, &input.walls, &mut new_boxes) {
-            input.robot = robot_dest;
-            input.boxes = new_boxes;
+    // We start facing east.
+    let initial = (input.start, Direction::Right);
+    let mut to_check = vec![initial];
+
+    let mut costs = HashMap::new();
+    costs.insert(initial, 0);
+
+    while let Some(current) = to_check.pop() {
+        // Doing a full search / mapping out of costs, rather that breadth first, since i'm too lazy
+        // to implement it and i'm expecting a kick in part 2 because of the last few puzzles.
+        let current_cost = *costs.get(&current).unwrap();
+
+        let mut test = |pos, dir, cost| {
+            let c = *costs.get(&(pos, dir)).unwrap_or(&i32::MAX);
+            if cost < c {
+                costs.insert((pos, dir), cost);
+                to_check.push((pos, dir));
+            }
+        };
+
+        let (current_pos, current_dir) = current;
+
+        // Moving in current direction _may_ not be a valid move. need to check positions.
+        let moved_pos = current_pos + current_dir.to_vec();
+        if input.positions.contains(&moved_pos) {
+            test(moved_pos, current_dir, current_cost + cost_move);
+        }
+
+        // figure out all adjacent verticies. check cost of them, and enqueue if we found cheaper
+        let rotated = [
+            (current_dir.rotate_cw(), current_cost + cost_rotate),
+            (current_dir.rotate_ccw(), current_cost + cost_rotate),
+            (current_dir.flip(), current_cost + cost_rotate * 2),
+        ];
+
+        for (dir, cost) in rotated {
+            // rotated are always valid verticies
+            test(current_pos, dir, cost);
         }
     }
 
-    print_field(input.robot, &input.boxes, &input.walls);
-    gps_sum(&input.boxes)
+    // at end, lowest of (end_node (all directions))
+    let endings = [
+        (input.end, Direction::Up),
+        (input.end, Direction::Right),
+        (input.end, Direction::Down),
+        (input.end, Direction::Left),
+    ];
+
+    endings
+        .iter()
+        .map(|n| *costs.get(n).unwrap())
+        .min()
+        .unwrap()
 }
 
-fn print_field(robot: Vec2, boxes: &HashSet<Vec2>, walls: &HashSet<Vec2>) {
-    for y in 0..50 {
-        for x in 0..100 {
-            let pos = Vec2(x, y);
-            let left = Vec2(x - 1, y);
-
-            let c = if pos == robot {
-                '@'
-            } else if walls.contains(&pos) {
-                '#'
-            } else if boxes.contains(&pos) {
-                '['
-            } else if boxes.contains(&left) {
-                // current pos is to the right of a box
-                ']'
-            } else {
-                '.'
-            };
-            print!("{c}");
-        }
-        println!();
-    }
-}
-
-// `position` is the space where something is trying to move in to.
-fn try_move(position: Vec2, m: Move, walls: &HashSet<Vec2>, boxes: &mut HashSet<Vec2>) -> bool {
-    if walls.contains(&position) {
-        return false;
-    }
-
-    if let Some(box_left) = boxes.take(&position) {
-        // Hit the left side of a box
-        let box_right = box_left + Vec2(1, 0);
-
-        let left_ok = try_move(box_left + m.to_vec(), m, walls, boxes);
-        let right_ok = try_move(box_right + m.to_vec(), m, walls, boxes);
-
-        if left_ok && right_ok {
-            boxes.insert(box_left + m.to_vec());
-        } else {
-            boxes.insert(box_left);
-            return false;
-        }
-    }
-
-    if let Some(box_left) = boxes.take(&(position + Vec2(-1, 0))) {
-        // Hit the right side of a box
-        let box_right = box_left + Vec2(1, 0);
-
-        let left_ok = try_move(box_left + m.to_vec(), m, walls, boxes);
-        let right_ok = try_move(box_right + m.to_vec(), m, walls, boxes);
-
-        if left_ok && right_ok {
-            boxes.insert(box_left + m.to_vec());
-        } else {
-            boxes.insert(box_left);
-            return false;
-        }
-    }
-
-    // empty space, can move in to it ok.
-    true
-}
-
-fn gps_sum(boxes: &HashSet<Vec2>) -> i64 {
-    boxes.iter().map(|b| (100 * b.1 + b.0) as i64).sum()
-}
-
-#[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Hash, Debug)]
 struct Vec2(i32, i32);
 
 impl std::ops::Add<Vec2> for Vec2 {
@@ -123,32 +99,54 @@ impl std::ops::Mul<i32> for Vec2 {
     }
 }
 
-#[derive(Clone, Copy)]
-enum Move {
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+enum Direction {
     Up,
     Right,
     Down,
     Left,
 }
 
-impl Move {
-    fn to_vec(&self) -> Vec2 {
+impl Direction {
+    fn to_vec(self) -> Vec2 {
         match self {
-            Move::Up => Vec2(0, -1),
-            Move::Right => Vec2(1, 0),
-            Move::Down => Vec2(0, 1),
-            Move::Left => Vec2(-1, 0),
+            Direction::Up => Vec2(0, -1),
+            Direction::Right => Vec2(1, 0),
+            Direction::Down => Vec2(0, 1),
+            Direction::Left => Vec2(-1, 0),
         }
+    }
+
+    fn rotate_cw(self) -> Self {
+        match self {
+            Direction::Up => Direction::Right,
+            Direction::Right => Direction::Down,
+            Direction::Down => Direction::Left,
+            Direction::Left => Direction::Up,
+        }
+    }
+
+    fn rotate_ccw(self) -> Self {
+        match self {
+            Direction::Up => Direction::Left,
+            Direction::Right => Direction::Up,
+            Direction::Down => Direction::Right,
+            Direction::Left => Direction::Down,
+        }
+    }
+
+    fn flip(self) -> Self {
+        self.rotate_cw().rotate_cw()
     }
 }
 
-impl From<char> for Move {
+impl From<char> for Direction {
     fn from(value: char) -> Self {
         match value {
-            '^' => Move::Up,
-            '>' => Move::Right,
-            'v' => Move::Down,
-            '<' => Move::Left,
+            '^' => Direction::Up,
+            '>' => Direction::Right,
+            'v' => Direction::Down,
+            '<' => Direction::Left,
             other => panic!("Unknown movement {other}"),
         }
     }
@@ -156,50 +154,34 @@ impl From<char> for Move {
 
 #[derive(Default)]
 struct Input {
-    robot: Vec2,
-    walls: HashSet<Vec2>,
-    boxes: HashSet<Vec2>,
-    instructions: Vec<Move>,
+    positions: HashSet<Vec2>,
+    start: Vec2,
+    end: Vec2,
 }
 
 fn read_input(input_path: &str) -> Input {
     let mut res = Input::default();
 
-    let mut y = 0;
-
-    for line in read_lines(input_path).unwrap() {
+    for (y, line) in read_lines(input_path).unwrap().enumerate() {
         let line = line.unwrap();
 
-        if line.starts_with('#') {
-            for (x, c) in line.chars().enumerate() {
-                let pos_l = Vec2((x * 2) as _, y);
-                let pos_r = Vec2((x * 2 + 1) as _, y);
+        for (x, c) in line.chars().enumerate() {
+            let pos = Vec2(x as _, y as _);
 
-                match c {
-                    '#' => {
-                        res.walls.insert(pos_l);
-                        res.walls.insert(pos_r);
-                    }
-                    'O' => {
-                        // We track the 'left' side of the box as its origin, and the rest of the
-                        // code assumes it extends to the right.
-                        res.boxes.insert(pos_l);
-                    }
-                    '@' => {
-                        res.robot = pos_l;
-                    }
-                    '.' => (), // empty space
-                    other => panic!("expected map character {other}"),
+            match c {
+                '#' => (), // wall, no op
+                '.' => {
+                    res.positions.insert(pos);
                 }
-            }
-
-            y += 1;
-        } else if line.is_empty() {
-            // No-op
-        } else {
-            // list of instructions
-            for c in line.chars() {
-                res.instructions.push(c.into());
+                'S' => {
+                    res.positions.insert(pos);
+                    res.start = pos;
+                }
+                'E' => {
+                    res.positions.insert(pos);
+                    res.end = pos;
+                }
+                other => panic!("expected map character {other}"),
             }
         }
     }
